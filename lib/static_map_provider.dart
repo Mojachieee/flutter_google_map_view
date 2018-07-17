@@ -1,9 +1,11 @@
 import 'dart:async';
 
 import 'package:map_view/location.dart';
+import 'package:map_view/polyline.dart';
 import 'package:uri/uri.dart';
-import 'map_view.dart';
+
 import 'locations.dart';
+import 'map_view.dart';
 import 'map_view_type.dart';
 
 class StaticMapProvider {
@@ -23,13 +25,8 @@ class StaticMapProvider {
 
   Uri getStaticUri(Location center, int zoomLevel,
       {int width, int height, StaticMapViewType mapType}) {
-    return _buildUrl(
-        null,
-        center,
-        zoomLevel ?? defaultZoomLevel,
-        width ?? defaultWidth,
-        height ?? defaultHeight,
-        mapType ?? defaultMaptype);
+    return _buildUrl(null, null, center, zoomLevel ?? defaultZoomLevel, width ?? defaultWidth,
+        height ?? defaultHeight, mapType ?? defaultMaptype);
   }
 
   ///
@@ -40,8 +37,20 @@ class StaticMapProvider {
 
   Uri getStaticUriWithMarkers(List<Marker> markers,
       {int width, int height, StaticMapViewType maptype, Location center}) {
-    return _buildUrl(markers, center, null, width ?? defaultWidth,
-        height ?? defaultHeight, maptype ?? defaultMaptype);
+    return _buildUrl(markers, null, center, null, width ?? defaultWidth, height ?? defaultHeight,
+        maptype ?? defaultMaptype);
+  }
+
+  ///
+  /// Creates a Uri for the Google Static Maps API using a list of polyline to create single or multiple polylines on the map.
+  /// [polylines] must have at least 1 polyline
+  /// Specify a [width] and [height] that you would like the resulting image to be. The default is 600w x 400h
+  ///
+
+  Uri getStaticUriWithPolyline(List<Polyline> polylines,
+      {int width, int height, StaticMapViewType maptype, Location center}) {
+    return _buildUrl(null, polylines, center, null, width ?? defaultWidth, height ?? defaultHeight,
+        maptype ?? defaultMaptype);
   }
 
   ///
@@ -51,12 +60,8 @@ class StaticMapProvider {
   /// Centers the map on [center] using a zoom of [zoomLevel]
   ///
   Uri getStaticUriWithMarkersAndZoom(List<Marker> markers,
-      {int width,
-      int height,
-      StaticMapViewType maptype,
-      Location center,
-      int zoomLevel}) {
-    return _buildUrl(markers, center, zoomLevel, width ?? defaultWidth,
+      {int width, int height, StaticMapViewType maptype, Location center, int zoomLevel}) {
+    return _buildUrl(markers, null, center, zoomLevel, width ?? defaultWidth,
         height ?? defaultHeight, maptype ?? defaultMaptype);
   }
 
@@ -71,32 +76,25 @@ class StaticMapProvider {
     var markers = await mapView.visibleAnnotations;
     var center = await mapView.centerLocation;
     var zoom = await mapView.zoomLevel;
-    return _buildUrl(markers, center, zoom.toInt(), width ?? defaultWidth,
+    return _buildUrl(markers, null, center, zoom.toInt(), width ?? defaultWidth,
         height ?? defaultHeight, maptype ?? defaultMaptype);
   }
 
-  Uri _buildUrl(List<Marker> locations, Location center, int zoomLevel,
+  Uri _buildUrl(List<Marker> locations, List<Polyline> polylines, Location center, int zoomLevel,
       int width, int height, StaticMapViewType mapType) {
     var finalUri = new UriBuilder()
       ..scheme = 'https'
       ..host = 'maps.googleapis.com'
       ..port = 443
       ..path = '/maps/api/staticmap';
+    String polylineUrlParam = "";
+    var locationsProvided = locations != null && locations.length > 0;
+    var polylinesProvided = polylines != null && polylines.length > 0;
 
-    if (center == null && (locations == null || locations.length == 0)) {
+    if (center == null && !locationsProvided && !polylinesProvided) {
       center = Locations.centerOfUSA;
     }
-
-    if (locations == null || locations.length == 0) {
-      if (center == null) center = Locations.centerOfUSA;
-      finalUri.queryParameters = {
-        'center': '${center.latitude},${center.longitude}',
-        'zoom': zoomLevel.toString(),
-        'size': '${width ?? defaultWidth}x${height ?? defaultHeight}',
-        'maptype': _getMapTypeQueryParam(mapType),
-        'key': googleMapsApiKey,
-      };
-    } else {
+    if (locationsProvided) {
       List<String> markers = new List();
       locations.forEach((location) {
         num lat = location.latitude;
@@ -111,12 +109,50 @@ class StaticMapProvider {
         'maptype': _getMapTypeQueryParam(mapType),
         'key': googleMapsApiKey,
       };
+    } else if (polylinesProvided) {
+      StringBuffer polylineBuffer = new StringBuffer();
+      StringBuffer polylineUrlComponent = new StringBuffer();
+      for (Polyline polyline in polylines) {
+        polylineBuffer.write('&path=');
+        if (polyline.color != null) {
+          polylineUrlComponent
+              .write('color:0x${polyline.color.value.toRadixString(16).substring(2)}|');
+        }
+        polylineUrlComponent.write(polyline.points
+            .map((Location location) =>
+                location.latitude.toString() + ',' + location.longitude.toString())
+            .join("|"));
+        polylineBuffer.write(Uri.decodeComponent(polylineUrlComponent.toString()));
+        polylineUrlComponent.clear();
+      }
+      polylineUrlParam = polylineBuffer.toString();
+      finalUri.queryParameters = {
+        'size': '${width ?? defaultWidth}x${height ?? defaultHeight}',
+        'maptype': _getMapTypeQueryParam(mapType),
+        'key': googleMapsApiKey,
+      };
+      polylineUrlParam = polylineBuffer.toString();
+    } else {
+      if (center == null) center = Locations.centerOfUSA;
+      finalUri.queryParameters = {
+        'center': '${center.latitude},${center.longitude}',
+        'zoom': zoomLevel.toString(),
+        'size': '${width ?? defaultWidth}x${height ?? defaultHeight}',
+        'maptype': _getMapTypeQueryParam(mapType),
+        'key': googleMapsApiKey,
+      };
     }
+
     if (center != null)
-      finalUri.queryParameters['center'] =
-          '${center.latitude},${center.longitude}';
+      finalUri.queryParameters['center'] = '${center.latitude},${center.longitude}';
 
     var uri = finalUri.build();
+    if (polylinesProvided) {
+      //hack for polylines to support different colors for each polyline
+      //using Map<String, String> you can't pass params with the same - but google supports it
+      uri = Uri.parse(uri.toString() + polylineUrlParam);
+    }
+    print(uri);
     return uri;
   }
 
