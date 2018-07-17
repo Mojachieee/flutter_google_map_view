@@ -25,8 +25,14 @@ class StaticMapProvider {
 
   Uri getStaticUri(Location center, int zoomLevel,
       {int width, int height, StaticMapViewType mapType}) {
-    return _buildUrl(null, null, center, zoomLevel ?? defaultZoomLevel, width ?? defaultWidth,
-        height ?? defaultHeight, mapType ?? defaultMaptype);
+    return _buildUrl(
+        null,
+        null,
+        center,
+        zoomLevel ?? defaultZoomLevel,
+        width ?? defaultWidth,
+        height ?? defaultHeight,
+        mapType ?? defaultMaptype);
   }
 
   ///
@@ -37,8 +43,8 @@ class StaticMapProvider {
 
   Uri getStaticUriWithMarkers(List<Marker> markers,
       {int width, int height, StaticMapViewType maptype, Location center}) {
-    return _buildUrl(markers, null, center, null, width ?? defaultWidth, height ?? defaultHeight,
-        maptype ?? defaultMaptype);
+    return _buildUrl(markers, null, center, null, width ?? defaultWidth,
+        height ?? defaultHeight, maptype ?? defaultMaptype);
   }
 
   ///
@@ -49,8 +55,8 @@ class StaticMapProvider {
 
   Uri getStaticUriWithPolyline(List<Polyline> polylines,
       {int width, int height, StaticMapViewType maptype, Location center}) {
-    return _buildUrl(null, polylines, center, null, width ?? defaultWidth, height ?? defaultHeight,
-        maptype ?? defaultMaptype);
+    return _buildUrl(null, polylines, center, null, width ?? defaultWidth,
+        height ?? defaultHeight, maptype ?? defaultMaptype);
   }
 
   ///
@@ -60,7 +66,11 @@ class StaticMapProvider {
   /// Centers the map on [center] using a zoom of [zoomLevel]
   ///
   Uri getStaticUriWithMarkersAndZoom(List<Marker> markers,
-      {int width, int height, StaticMapViewType maptype, Location center, int zoomLevel}) {
+      {int width,
+      int height,
+      StaticMapViewType maptype,
+      Location center,
+      int zoomLevel}) {
     return _buildUrl(markers, null, center, zoomLevel, width ?? defaultWidth,
         height ?? defaultHeight, maptype ?? defaultMaptype);
   }
@@ -80,8 +90,14 @@ class StaticMapProvider {
         height ?? defaultHeight, maptype ?? defaultMaptype);
   }
 
-  Uri _buildUrl(List<Marker> locations, List<Polyline> polylines, Location center, int zoomLevel,
-      int width, int height, StaticMapViewType mapType) {
+  Uri _buildUrl(
+      List<Marker> locations,
+      List<Polyline> polylines,
+      Location center,
+      int zoomLevel,
+      int width,
+      int height,
+      StaticMapViewType mapType) {
     var finalUri = new UriBuilder()
       ..scheme = 'https'
       ..host = 'maps.googleapis.com'
@@ -115,14 +131,17 @@ class StaticMapProvider {
       for (Polyline polyline in polylines) {
         polylineBuffer.write('&path=');
         if (polyline.color != null) {
-          polylineUrlComponent
-              .write('color:0x${polyline.color.value.toRadixString(16).substring(2)}|');
+          polylineUrlComponent.write(
+              'color:0x${polyline.color.value.toRadixString(16).substring(2)}|');
         }
         polylineUrlComponent.write(polyline.points
             .map((Location location) =>
-                location.latitude.toString() + ',' + location.longitude.toString())
+                location.latitude.toString() +
+                ',' +
+                location.longitude.toString())
             .join("|"));
-        polylineBuffer.write(Uri.decodeComponent(polylineUrlComponent.toString()));
+        polylineBuffer
+            .write(Uri.decodeComponent(polylineUrlComponent.toString()));
         polylineUrlComponent.clear();
       }
       polylineUrlParam = polylineBuffer.toString();
@@ -144,7 +163,8 @@ class StaticMapProvider {
     }
 
     if (center != null)
-      finalUri.queryParameters['center'] = '${center.latitude},${center.longitude}';
+      finalUri.queryParameters['center'] =
+          '${center.latitude},${center.longitude}';
 
     var uri = finalUri.build();
     if (polylinesProvided) {
@@ -152,7 +172,6 @@ class StaticMapProvider {
       //using Map<String, String> you can't pass params with the same - but google supports it
       uri = Uri.parse(uri.toString() + polylineUrlParam);
     }
-    print(uri);
     return uri;
   }
 
